@@ -1,1 +1,1 @@
-python C:\uirs2\main.py
+python main.py
