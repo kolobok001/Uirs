@@ -75,6 +75,13 @@ def give(bot, update):
 		usermanager.give_item(update.message.chat_id, item_type, name)
 	else:
 		bot.sendMessage(update.message.chat_id, text='NO.')
+		
+def giveusr(bot, update):
+	if str(update.message.chat_id) in config.ADMINS_IDS:
+		cmd, id, item_type, name = update.message.text.split()
+		usermanager.give_item(id, item_type, name)
+	else:
+		bot.sendMessage(update.message.chat_id, text='NO.')
 
 def notify(bot, update):
 	if str(update.message.chat_id) in config.ADMINS_IDS:
@@ -284,6 +291,7 @@ updater.dispatcher.add_handler(CommandHandler('start', start))
 updater.dispatcher.add_handler(CommandHandler('stop', stop))
 updater.dispatcher.add_handler(CommandHandler('room', room))
 updater.dispatcher.add_handler(CommandHandler('give', give))
+updater.dispatcher.add_handler(CommandHandler('giveusr', giveusr))
 
 
 updater.dispatcher.add_handler(CommandHandler('question_status', question_status))
