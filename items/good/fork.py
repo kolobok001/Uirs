@@ -8,4 +8,4 @@ price = 495
 fightable = True
 
 def fight_use(user, reply, room):
-  return 100
+  return 3+3+3
