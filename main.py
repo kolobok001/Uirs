@@ -45,14 +45,14 @@ def reply(c_id, bot, txt, buttons=None, photo=None):
 		bot.sendSticker(c_id, sticker=photo)
 
 def start(bot, update):
-	bot.sendMessage(update.message.chat_id, text='Теперь скажи мне свое имя.')
+	bot.sendMessage(update.message.chat_id, text='Скажи мне свое имя, путник.')
 	usermanager.new_user(update.message.chat_id)
 
 def setname(bot, update):
 	txt = update.message.text.split()
 	if len(txt) > 9:
 		name = update.message.text[10:]
-		usermanager.setname(update.message.chat_id, name)
+		#usermanager.setname(update.message.chat_id, name)
 
 		bot.sendMessage(update.message.chat_id, text='Ну хорошо')
 
