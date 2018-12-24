@@ -234,11 +234,11 @@ def leaderboard(bot, update):
 				pass
 
 	res = databasemanager.get_leaderboard(lb, count=cnt)
-	msg = ''
+	msg = 'Рейтинг по количеству пройденных комнат \n'
 
 	if lb == 'death':
 		for i, r in enumerate(res):
-			msg += '{0}. {1}: {2}\n'.format(i + 1, r[0], r[1])
+			msg += '{0}. {1}: {2} \n'.format(i + 1, r[0], r[1])
 	else:
 		for i, r in enumerate(res):
 			uid = r['uid']
