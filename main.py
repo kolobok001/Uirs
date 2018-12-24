@@ -303,7 +303,7 @@ updater.dispatcher.add_error_handler(error_callback)
 
 
 
-updater.job_queue.run_once(divine_intervention, 3 * 60 * 60.0)
+updater.job_queue.run_repeating(divine_intervention, 3*60*60.0 )
 logger.info('Starting polling...')
 updater.start_polling()
 
