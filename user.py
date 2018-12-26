@@ -16,7 +16,8 @@ from collections import Counter
 from localizations import locale_manager
 import usermanager
 import databasemanager as dbmanager
-
+from PIL import Image
+import telegram
 logger = logging.getLogger('rg')
 
 class User(object):
@@ -419,7 +420,7 @@ class User(object):
 		if self.state == 'room':
 			room = roomloader.load_room(self.room[1], self.room[0])
 			reply(locale_manager.get('DEATH_PLACE').format(room.name))
-
+			#reply(imageTg='images/death.png')
 		self.dead = True
 		self.state = ''
 

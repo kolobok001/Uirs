@@ -27,11 +27,11 @@ if os.path.isfile(question_filename):
  		asked = f.readline().split()
 
 def reply_job(bot, job):
-	c_id, bot, txt, buttons, photo = job.context
-	reply(c_id, bot, txt, buttons, photo)
+	c_id, bot, txt, buttons, stickerTg, imageTg = job.context
+	reply(c_id, bot, txt, buttons, stickerTg, imageTg)
 
 @run_async
-def reply(c_id, bot, txt, buttons=None, photo=None):
+def reply(c_id, bot, txt, buttons=None, stickerTg=None, imageTg=None):
 	if buttons:
 		custom_keyboard = [ [ x ] for x in buttons ]
 		reply_markup = telegram.ReplyKeyboardMarkup(custom_keyboard, one_time_keyboard=True)
@@ -40,9 +40,11 @@ def reply(c_id, bot, txt, buttons=None, photo=None):
 		bot.sendMessage(c_id,
 						text=txt, 
 						parse_mode=telegram.ParseMode.MARKDOWN)
-
-	if photo:
-		bot.sendSticker(c_id, sticker=photo)
+	
+	if stickerTg:
+		bot.sendSticker(c_id, sticker=stickerTg)
+	elif imageTg:
+		bot.sendPhoto(c_id, open(imageTg, 'rb'))#)photo=imageTg
 
 def start(bot, update):
 	bot.sendMessage(update.message.chat_id, text='Скажи мне свое имя, путник.')
@@ -52,7 +54,7 @@ def setname(bot, update):
 	txt = update.message.text.split()
 	if len(txt) > 9:
 		name = update.message.text[10:]
-		#usermanager.setname(update.message.chat_id, name)
+		usermanager.setname(update.message.chat_id, name)
 
 		bot.sendMessage(update.message.chat_id, text='Ну хорошо')
 
