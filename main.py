@@ -45,14 +45,14 @@ def reply(c_id, bot, txt, buttons=None, photo=None):
 		bot.sendSticker(c_id, sticker=photo)
 
 def start(bot, update):
-	bot.sendMessage(update.message.chat_id, text='Скажи мне свое имя, путник.')
+	bot.sendMessage(update.message.chat_id, text='Теперь скажи мне свое имя.')
 	usermanager.new_user(update.message.chat_id)
 
 def setname(bot, update):
 	txt = update.message.text.split()
 	if len(txt) > 9:
 		name = update.message.text[10:]
-		#usermanager.setname(update.message.chat_id, name)
+		usermanager.setname(update.message.chat_id, name)
 
 		bot.sendMessage(update.message.chat_id, text='Ну хорошо')
 
@@ -234,11 +234,11 @@ def leaderboard(bot, update):
 				pass
 
 	res = databasemanager.get_leaderboard(lb, count=cnt)
-	msg = ''
+	msg = 'Рейтинг по количеству пройденных комнат \n'
 
 	if lb == 'death':
 		for i, r in enumerate(res):
-			msg += '{0}. {1}: {2}\n'.format(i + 1, r[0], r[1])
+			msg += '{0}. {1}: {2} \n'.format(i + 1, r[0], r[1])
 	else:
 		for i, r in enumerate(res):
 			uid = r['uid']
@@ -303,7 +303,7 @@ updater.dispatcher.add_error_handler(error_callback)
 
 
 
-updater.job_queue.run_once(divine_intervention, 3 * 60 * 60.0)
+updater.job_queue.run_repeating(divine_intervention, 3*60*60.0 )
 logger.info('Starting polling...')
 updater.start_polling()
 
