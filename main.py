@@ -234,11 +234,11 @@ def leaderboard(bot, update):
 				pass
 
 	res = databasemanager.get_leaderboard(lb, count=cnt)
-	msg = 'Рейтинг по количеству пройденных комнат \n'
+	msg = ''
 
 	if lb == 'death':
 		for i, r in enumerate(res):
-			msg += '{0}. {1}: {2} \n'.format(i + 1, r[0], r[1])
+			msg += '{0}. {1}: {2}\n'.format(i + 1, r[0], r[1])
 	else:
 		for i, r in enumerate(res):
 			uid = r['uid']
@@ -303,7 +303,7 @@ updater.dispatcher.add_error_handler(error_callback)
 
 
 
-updater.job_queue.run_repeating(divine_intervention, 3*60*60.0 )
+updater.job_queue.run_once(divine_intervention, 3 * 60 * 60.0)
 logger.info('Starting polling...')
 updater.start_polling()
 

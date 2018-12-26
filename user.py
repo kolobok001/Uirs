@@ -298,10 +298,12 @@ class User(object):
 		return old_hp - self.hp
 
 	def update_leaderbord(self, reason=None):
-		rate = 1
-		
-		rate = self.rooms_count
-			
+		rate = 0
+		if self.rooms_count > 0:
+			try:
+				rate = ((((self.get_damage() * self.get_intelligence() + self.gold) / self.rooms_count) ** 0.5) ** 1.5) // 100 
+			except:
+				pass
 
 		self.death_reason = reason
 		dbmanager.add_to_leaderboard(self, rate, dbmanager.RATE_TABLE)
