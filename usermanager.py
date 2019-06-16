@@ -9,13 +9,25 @@ def get_fname(uid):
 	return config.USERS_PATH + '/{0}.usr'.format(uid)
 
 def save_user(usr):
+	if usr is None:
+		return
+		
 	with open(get_fname(usr.uid), 'wb') as outfile:
 		pickle.dump(usr, outfile)
 
-def new_user(uid):
-	usr = User(uid)
+def new_user(uid, nickname=None, reply=lambda *x, **y: None):
+	usr = get_user(uid)
+	res = False
+
+	if usr is None or usr.confirm_restart(reply):
+		usr = User(uid)
+		if nickname is not None:
+			usr.nickname = nickname
+		reply('Теперь скажи мне свое имя.')
+		res = True
 
 	save_user(usr)
+	return res
 
 def random_user():
 	return get_user(random.choice(list(get_telegram_users())))
@@ -52,8 +64,8 @@ def message(uid, reply, text):
 
 	if not usr:
 		reply('Что-то пошло не так. Попробуй /start')
-	else:
-		usr.message(reply, text)
+	elif usr.message(reply, text):
+		usr = User(uid)
 
 	save_user(usr)
 
@@ -68,8 +80,7 @@ def debug_info(uid):
 def setname(uid, name):
 	usr = get_user(uid)
 	usr.name = name
-	save_user(uid)
-
+	save_user(usr)
 
 def open_room(uid, reply, room_type, name):
 	usr = get_user(uid)
@@ -84,4 +95,9 @@ def open_room(uid, reply, room_type, name):
 def give_item(uid, item_type, name):
 	usr = get_user(uid)
 	usr.add_item(item_type, name)
+	save_user(usr)
+
+def new_pet(uid, pet, name):
+	usr = get_user(uid)
+	usr.pet = (pet, name)
 	save_user(usr)

@@ -1,11 +1,13 @@
 name = 'Лазерный пистолет'
 description = (
-	'Хороший такой ЛАЗЕРНЫЙ пистолет'
+	'Хороший такой ЛАЗЕРНЫЙ пистолет.'
 )
 
 price = 300
 
 fightable = True
+
+strengthoff = True
 
 def fight_use(user, reply, room):
 	res = 0

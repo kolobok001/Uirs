@@ -1,10 +1,15 @@
+#!/usr/bin/python3
+
 import config
+
+import statistics
 
 from telegram.ext.dispatcher import run_async
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
 from telegram.ext import Job
+from collections import deque
 
-
+import tornamentmanager
 import databasemanager
 import usermanager
 import telegram
@@ -17,41 +22,113 @@ logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s',
 logger = logging.getLogger('rg')
 
 question_filename = 'question.int'
-question_yes = 0
-question_no = 0
+question_yes = 388
+question_no = 78
 asked = [ ]
+queue = deque([])
 
-if os.path.isfile(question_filename):
-	with open(question_filename, 'r') as f:
- 		question_yes, question_no = map(int, f.readline().split())
- 		asked = f.readline().split()
+updater = Updater(config.TELEGRAM_TOKEN)
 
-def reply_job(bot, job):
-	c_id, bot, txt, buttons, photo = job.context
-	reply(c_id, bot, txt, buttons, photo)
+def queue_reply(bot, job):
+	try:
+		message = queue.popleft()
+
+		if message:
+			c_id, bot, txt, buttons, photo, repeat = message
+			_reply(c_id, bot, txt, buttons, photo, repeat)
+
+	except:
+		pass
 
 @run_async
-def reply(c_id, bot, txt, buttons=None, photo=None):
+def _reply(c_id, bot, txt, buttons=None, photo=None, repeat=True):
+	if c_id == 0:
+		return
 	if buttons:
-		custom_keyboard = [ [ x ] for x in buttons ]
+		custom_keyboard = [ ]
+
+		for b in buttons:
+			if isinstance(b, list):
+				custom_keyboard.append(b)
+			else:
+				custom_keyboard.append([b])
+
 		reply_markup = telegram.ReplyKeyboardMarkup(custom_keyboard, one_time_keyboard=True)
-		bot.sendMessage(c_id, text=txt, reply_markup=reply_markup, parse_mode=telegram.ParseMode.MARKDOWN)
+		try:
+			bot.sendMessage(c_id, text=txt, reply_markup=reply_markup, parse_mode=telegram.ParseMode.MARKDOWN)
+		except Exception as e:
+			if not repeat:
+				raise e
+
+			if '429' in str(e):
+				send_job = Job(reply_job, 1, repeat=False, context=(c_id, bot, txt, buttons, photo))
+				updater.job_queue.put(send_job)
+			else:
+				raise e
+
 	elif len(txt) > 0:
-		bot.sendMessage(c_id,
-						text=txt, 
-						parse_mode=telegram.ParseMode.MARKDOWN)
+		bot.sendMessage(c_id, text=txt, parse_mode=telegram.ParseMode.MARKDOWN)
 
 	if photo:
 		bot.sendSticker(c_id, sticker=photo)
 
+
+def reply_job(bot, job):
+	c_id, bot, txt, buttons, photo = job.context
+	reply(c_id, bot, txt, buttons, photo, repeat=False)
+
+
+def reply(c_id, bot, txt, buttons=None, photo=None, repeat=True):
+	if c_id == 0:
+		return
+
+	queue.append([ c_id, bot, txt, buttons, photo, repeat ])
+
+
 def start(bot, update):
-	bot.sendMessage(update.message.chat_id, text='Теперь скажи мне свое имя.')
-	usermanager.new_user(update.message.chat_id)
+	c_id = update.message.chat_id
+	global msg, image, buttons
+	msg = ''
+	image = None
+	buttons = None
+
+	statistics.track(c_id, update.message, 'Start')
+
+	def rep(txt, btns=None, photo=None):
+		global msg, image, buttons
+
+		if len(msg) + len(txt) + 2 >= 4096:
+			reply(c_id, bot, msg, buttons, image)
+
+			msg = ''
+			image = None
+			buttons = None
+
+
+		msg += '\n\n'
+		msg += txt
+
+		if btns:
+			buttons = btns
+		if photo:
+			image = photo
+
+	username = ''
+	try:
+		username = bot.getChat(uid)['username']
+	except:
+		pass
+	usermanager.new_user(c_id, username if len(username) > 0 else None, rep)
+	if len(msg) > 0 or image:
+		reply(c_id, bot, msg, buttons, image)
 
 def setname(bot, update):
-	txt = update.message.text.split()
-	if len(txt) > 9:
-		name = update.message.text[10:]
+
+	txt = update.message.text
+	if len(txt) > len('/setname'):
+		statistics.track(update.message.chat_id, update.message, 'Setname')
+		
+		name = txt[len('/setname')+1:]
 		usermanager.setname(update.message.chat_id, name)
 
 		bot.sendMessage(update.message.chat_id, text='Ну хорошо')
@@ -62,27 +139,39 @@ def debug_print(bot, update):
 
 def room(bot, update):
 	c_id = update.message.chat_id
-     
-	if str(c_id) in config.ADMINS_IDS:
+
+	if str(c_id) in config.MODERS_IDS:
 		cmd, room_type, name = update.message.text.split()
 		usermanager.open_room(c_id, lambda *a, **kw: reply(c_id, bot, *a, **kw), room_type, name)
 	else:
 		bot.sendMessage(update.message.chat_id, text='NO.')
 
 def give(bot, update):
-	if str(update.message.chat_id) in config.ADMINS_IDS:
+	if str(update.message.chat_id) in config.MODERS_IDS:
 		cmd, item_type, name = update.message.text.split()
 		usermanager.give_item(update.message.chat_id, item_type, name)
 	else:
 		bot.sendMessage(update.message.chat_id, text='NO.')
-		
-def giveusr(bot, update):
-	if str(update.message.chat_id) in config.ADMINS_IDS:
-		cmd, id, item_type, name = update.message.text.split()
-		usermanager.give_item(id, item_type, name)
+
+def gold(bot, update):
+	if str(update.message.chat_id) in config.MODERS_IDS:
+		cmd, integer = update.message.text.split()
+		integer = int(integer)
+
+		user = usermanager.get_user(update.message.chat_id)
+		user.gold += integer
+		usermanager.save_user(user)
 	else:
 		bot.sendMessage(update.message.chat_id, text='NO.')
 
+def pet(bot, update):
+	if str(update.message.chat_id) in config.MODERS_IDS:
+		cmd, pet, name = update.message.text.split()
+		usermanager.new_pet(update.message.chat_id, pet, name)
+	else:
+		bot.sendMessage(update.message.chat_id, text='NO.')
+
+@run_async
 def notify(bot, update):
 	if str(update.message.chat_id) in config.ADMINS_IDS:
 		msg = update.message.text[len('/notify'):]
@@ -91,7 +180,7 @@ def notify(bot, update):
 
 		for user_id in usermanager.get_telegram_users():
 			try:
-				reply(user_id, bot, msg)
+				bot.sendMessage(user_id, text=msg)
 			except:
 				logger.info('Couldn\'t send message to {0}'.format(user_id))
 	else:
@@ -147,6 +236,38 @@ def no(bot, update):
 
 		save_question()
 
+def update_tornament(bot, job):
+	global uid, msg, image, buttons
+	uid = 0
+	msg = ''
+	image = None
+	buttons = None
+
+	def rep(c_id, txt, btns=None, photo=None):
+		global uid, msg, image, buttons
+
+		if uid != 0 and c_id != uid:
+			reply(uid, bot, msg, buttons, image)
+
+			msg = ''
+			image = None
+			buttons = None
+
+		uid = c_id
+
+		msg += '\n\n'
+		msg += txt
+
+		if btns:
+			buttons = btns
+		if photo:
+			image = photo
+
+	tornamentmanager.update(rep)
+	if len(msg) > 0 or image:
+		reply(uid, bot, msg, buttons, image)
+
+@run_async
 def divine_intervention(bot, job):
 	logger.info('Divine intervention!')
 
@@ -182,6 +303,7 @@ def divine_intervention(bot, job):
 
 def msg(bot, update):
 	c_id = update.message.chat_id
+	statistics.track(c_id, update.message)
 
 	global msg, image, buttons
 	msg = ''
@@ -192,7 +314,7 @@ def msg(bot, update):
 		global msg, image, buttons
 
 		if len(msg) + len(txt) + 2 >= 4096:
-			reply(c_id, bot, msg, buttons, image)
+			_reply(c_id, bot, msg, buttons, image)
 
 			msg = ''
 			image = None
@@ -212,16 +334,12 @@ def msg(bot, update):
 	if len(msg) > 0 or image:
 		global updater
 
-		send_job = Job(reply_job,
-						0.040,
-						repeat=False,
-						context=(c_id, bot, msg, buttons, image))
-		reply(c_id, bot, msg, buttons, image)
-
+		_reply(c_id, bot, msg, buttons, image)
+@run_async
 def leaderboard(bot, update):
 	c_id = update.message.chat_id
 
-	lb = databasemanager.RATE_TABLE
+	lb = databasemanager.ROOMS_TABLE
 	cnt = 10
 	if len(update.message.text.split(' ')) >= 2:
 		lb = update.message.text.split(' ')[1]
@@ -234,35 +352,46 @@ def leaderboard(bot, update):
 				pass
 
 	res = databasemanager.get_leaderboard(lb, count=cnt)
-	msg = 'Рейтинг по количеству пройденных комнат \n'
+	msg = ''
 
 	if lb == 'death':
 		for i, r in enumerate(res):
-			msg += '{0}. {1}: {2} \n'.format(i + 1, r[0], r[1])
+			msg += '{0}. {1}: {2}\n'.format(i + 1, r['death_reason'], round(r['count']))
 	else:
 		for i, r in enumerate(res):
 			uid = r['uid']
 			name = r['name']
-			score = r['score']
+			score = round(r['score'])
 			username = bot.getChat(uid)['username']
 			death_reason = None
 			if 'death_reason' in r:
 				death_reason = r['death_reason']
 
 			table_name = "{0}".format(name)
-			
+			if len(username) > 0:
+				table_name += ' (@{0})'.format(username)
 				
-			msg += '{0}. {1}: {2}\n'.format(i + 1, table_name, score)
+			msg += '{0}. {1}: {2}'.format(i + 1, table_name, score)
 			if death_reason is not None:
-				msg += 'Причина смерти: ' + death_reason
+				msg += '\nПричина смерти: ' + death_reason
 
 			msg += '\n'
 
 	bot.sendMessage(update.message.chat_id, text=msg)
 
 def stop(bot, update):
+	statistics.track(update.message.chat_id, update.message, 'Stop')
 	usermanager.delete(update.message.chat_id)
 
+def cesar(bot, update):
+	v = databasemanager.get_variable('ces', def_val=True)
+	databasemanager.set_variable('ces', not v)
+
+@run_async
+def rate(bot, update):
+	c_id = update.message.chat_id
+	link = statistics.get_link(c_id)
+	bot.sendMessage(update.message.chat_id, text='Держи ссылку ;)\n\n{0}'.format(link))
 
 def error_callback(bot, update, error):
 	error_msg = 'User "%s" had error "%s"' % (update.message.chat_id, error)
@@ -270,42 +399,58 @@ def error_callback(bot, update, error):
 		logger.warn('429!')
 	else:
 		logger.warn(error_msg)
-	msg = 'Ошибка внутри сервера. Если это мешает играть, сообщите '
+	msg = 'Ошибка внутри сервера. Если это мешает играть, сообщите @yegorf1'
 	bot.sendMessage(update.message.chat_id, text=msg)
 	bot.sendMessage(update.message.chat_id, 
 					text='```text\n{0}\n```'.format(error_msg),
 					parse_mode=telegram.ParseMode.MARKDOWN)
 
-if not os.path.isdir(config.USERS_PATH):
-	logger.info('Creating users directory')
-	os.makedirs(config.USERS_PATH)
+def main():
+	if os.path.isfile(question_filename):
+		with open(question_filename, 'r') as f:
+			question_yes, question_no = map(int, f.readline().split())
+			asked = f.readline().split()
+			
+	if not os.path.isdir(config.USERS_PATH):
+		logger.info('Creating users directory')
+		os.makedirs(config.USERS_PATH)
 
-logger.info('Creating Updater...')
-updater = Updater(config.TELEGRAM_TOKEN)
+	logger.info('Creating Updater...')
 
-updater.dispatcher.add_handler(CommandHandler('leaderboard', leaderboard))
-updater.dispatcher.add_handler(CommandHandler('setname', setname))
-updater.dispatcher.add_handler(CommandHandler('notify', notify))
-updater.dispatcher.add_handler(CommandHandler('debug', debug_print))
-updater.dispatcher.add_handler(CommandHandler('start', start))
-updater.dispatcher.add_handler(CommandHandler('stop', stop))
-updater.dispatcher.add_handler(CommandHandler('room', room))
-updater.dispatcher.add_handler(CommandHandler('give', give))
-updater.dispatcher.add_handler(CommandHandler('giveusr', giveusr))
-
-
-updater.dispatcher.add_handler(CommandHandler('question_status', question_status))
-updater.dispatcher.add_handler(CommandHandler('zero', zero))
-updater.dispatcher.add_handler(CommandHandler('yes', yes))
-updater.dispatcher.add_handler(CommandHandler('no', no))
-updater.dispatcher.add_handler(MessageHandler(False, msg))
-updater.dispatcher.add_error_handler(error_callback)
+	updater.dispatcher.add_handler(CommandHandler('leaderboard', leaderboard))
+	updater.dispatcher.add_handler(CommandHandler('setname', setname))
+	updater.dispatcher.add_handler(CommandHandler('notify', notify))
+	updater.dispatcher.add_handler(CommandHandler('debug', debug_print))
+	updater.dispatcher.add_handler(CommandHandler('cesar', cesar))
+	updater.dispatcher.add_handler(CommandHandler('start', start))
+	updater.dispatcher.add_handler(CommandHandler('rate', rate))
+	updater.dispatcher.add_handler(CommandHandler('stop', stop))
+	updater.dispatcher.add_handler(CommandHandler('room', room))
+	updater.dispatcher.add_handler(CommandHandler('give', give))
+	updater.dispatcher.add_handler(CommandHandler('gold', gold))
+	updater.dispatcher.add_handler(CommandHandler('pet', pet))
 
 
+	updater.dispatcher.add_handler(CommandHandler('question_status', question_status))
+	updater.dispatcher.add_handler(CommandHandler('zero', zero))
+	updater.dispatcher.add_handler(CommandHandler('yes', yes))
+	updater.dispatcher.add_handler(CommandHandler('no', no))
+	updater.dispatcher.add_handler(MessageHandler(False, msg))
+	updater.dispatcher.add_error_handler(error_callback)
 
-updater.job_queue.run_repeating(divine_intervention, 3*60*60.0 )
-logger.info('Starting polling...')
-updater.start_polling()
+	intervention_job = Job(divine_intervention, 3 * 60 * 60.0)
+	update_tornament_job = Job(update_tornament, 10.0)
+	updater.job_queue.put(intervention_job)
+	updater.job_queue.put(update_tornament_job)
 
-logger.info('Bot now officially started!')
-updater.idle()
+	queue_job = Job(queue_reply, 0.035)
+	updater.job_queue.put(queue_job)
+
+	logger.info('Starting polling...')
+	updater.start_polling()
+
+	logger.info('Bot now officially started!')
+	updater.idle()
+
+if __name__ == '__main__':
+	main()
