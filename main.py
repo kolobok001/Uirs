@@ -399,7 +399,7 @@ def error_callback(bot, update, error):
 		logger.warn('429!')
 	else:
 		logger.warn(error_msg)
-	msg = 'Ошибка внутри сервера. Если это мешает играть, сообщите @yegorf1'
+	msg = 'Ошибка внутри сервера. Если это мешает играть, сообщите админам'
 	bot.sendMessage(update.message.chat_id, text=msg)
 	bot.sendMessage(update.message.chat_id, 
 					text='```text\n{0}\n```'.format(error_msg),
@@ -438,13 +438,10 @@ def main():
 	updater.dispatcher.add_handler(MessageHandler(False, msg))
 	updater.dispatcher.add_error_handler(error_callback)
 
-	intervention_job = Job(divine_intervention, 3 * 60 * 60.0)
-	update_tornament_job = Job(update_tornament, 10.0)
-	updater.job_queue.put(intervention_job)
-	updater.job_queue.put(update_tornament_job)
+	updater.job_queue.run_repeating(divine_intervention, 3 * 60 * 60.0)
+	updater.job_queue.run_repeating(update_tornament, 10.0)
+	updater.job_queue.run_repeating(queue_reply, 0.035)
 
-	queue_job = Job(queue_reply, 0.035)
-	updater.job_queue.put(queue_job)
 
 	logger.info('Starting polling...')
 	updater.start_polling()
